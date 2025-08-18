@@ -1,4 +1,8 @@
-"""Pytest configuration and fixtures for batcher tests."""
+"""Pytest configuration and test fixtures for batcher application.
+
+Provides reusable fixtures for creating temporary directories with various
+file configurations for comprehensive testing scenarios.
+"""
 
 import tempfile
 from pathlib import Path

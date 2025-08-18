@@ -1,7 +1,6 @@
 import os
 import time
 from pathlib import Path
-from typing import Optional
 
 import typer
 from tqdm import tqdm
@@ -11,7 +10,20 @@ app = typer.Typer(help="A high-speed Python utility for organizing files into ba
 
 
 def get_files_to_batch(source_directory: Path) -> list[str]:
-    """Get list of files to batch, excluding this script."""
+    """Get list of files to batch from source directory.
+    
+    Scans the specified directory for files, excluding the script itself
+    and any subdirectories. Only processes files at the root level.
+    
+    Args:
+        source_directory: Directory path to scan for files.
+        
+    Returns:
+        List of filenames found in the directory, excluding script itself.
+        
+    Raises:
+        typer.Exit: If directory cannot be accessed due to OS errors.
+    """
     try:
         with os.scandir(source_directory) as it:
             files_to_move = [entry.name for entry in it if entry.is_file()]
@@ -28,7 +40,19 @@ def get_files_to_batch(source_directory: Path) -> list[str]:
 
 
 def validate_directory(directory: Path) -> Path:
-    """Validate that the directory exists."""
+    """Validate that the provided path is an existing directory.
+    
+    Checks if the path exists and is a directory, not a file.
+    
+    Args:
+        directory: Path to validate as an existing directory.
+        
+    Returns:
+        The validated directory path if checks pass.
+        
+    Raises:
+        typer.Exit: If directory doesn't exist or is not a directory.
+    """
     if not directory.exists():
         typer.echo(f"Error: Directory '{directory}' not found.", err=True)
         raise typer.Exit(1)
@@ -47,7 +71,25 @@ def process_batches(
     batch_prefix: str = "batch",
     dry_run: bool = False
 ) -> None:
-    """Process files into batches."""
+    """Process files into organized batch subdirectories.
+    
+    Moves files from the source directory into numbered batch subdirectories,
+    with each batch containing up to the specified number of files. Uses
+    high-speed os.rename() for same-filesystem moves.
+    
+    Args:
+        files: List of filenames to process into batches.
+        source_directory: Source directory containing the files.
+        files_per_batch: Maximum number of files per batch directory.
+        batch_prefix: Prefix for batch directory names (default: "batch").
+        dry_run: If True, show what would be done without moving files.
+        
+    Returns:
+        None
+        
+    Raises:
+        None - Handles individual file move errors gracefully.
+    """
     total_files = len(files)
     
     if dry_run:
@@ -89,10 +131,45 @@ def process_batches(
     typer.echo("\nBatching complete!")
 
 
+def _get_directory_input(directory: Path | None, interactive: bool) -> Path:
+    """Get directory from user input when missing or in interactive mode.
+    
+    Args:
+        directory: Current directory value or None.
+        interactive: Whether running in interactive mode.
+        
+    Returns:
+        Valid directory path from user input.
+    """
+    if interactive or directory is None:
+        directory_str = typer.prompt("Enter the path to the directory with files").strip().strip('\'"')
+        directory = Path(directory_str)
+    return directory
+
+
+def _get_batch_size_input(batch_size: int | None, interactive: bool) -> int:
+    """Get batch size from user input when missing or in interactive mode.
+    
+    Args:
+        batch_size: Current batch size value or None.
+        interactive: Whether running in interactive mode.
+        
+    Returns:
+        Valid batch size from user input.
+    """
+    if interactive or batch_size is None:
+        while True:
+            try:
+                return typer.prompt("Enter the number of files per batch", type=int)
+            except typer.BadParameter:
+                typer.echo("Invalid input. Please enter a whole number.")
+    return batch_size
+
+
 @app.command()
 def batch(
-    directory: Annotated[Path, typer.Argument(help="Directory containing files to batch")] = None,
-    batch_size: Annotated[int, typer.Option("--batch-size", "-b", help="Number of files per batch")] = None,
+    directory: Annotated[Path | None, typer.Argument(help="Directory containing files to batch")] = None,
+    batch_size: Annotated[int | None, typer.Option("--batch-size", "-b", help="Number of files per batch")] = None,
     batch_prefix: Annotated[str, typer.Option("--prefix", "-p", help="Prefix for batch folder names")] = "batch",
     dry_run: Annotated[bool, typer.Option("--dry-run", "-n", help="Show what would be done without actually moving files")] = False,
     interactive: Annotated[bool, typer.Option("--interactive", "-i", help="Use interactive mode for input")] = False,
@@ -105,20 +182,9 @@ def batch(
     """
     start_time = time.time()
     
-    # Interactive mode or missing arguments
-    if interactive or directory is None:
-        if directory is None:
-            directory_str = typer.prompt("Enter the path to the directory with files").strip().strip('\'"')
-            directory = Path(directory_str)
-    
-    if interactive or batch_size is None:
-        if batch_size is None:
-            while True:
-                try:
-                    batch_size = typer.prompt("Enter the number of files per batch", type=int)
-                    break
-                except typer.BadParameter:
-                    typer.echo("Invalid input. Please enter a whole number.")
+    # Get inputs from user if needed
+    directory = _get_directory_input(directory, interactive)
+    batch_size = _get_batch_size_input(batch_size, interactive)
     
     # Validate inputs
     directory = validate_directory(directory)
