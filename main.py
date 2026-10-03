@@ -1,10 +1,10 @@
 import os
 import time
 from pathlib import Path
+from typing import Annotated
 
 import typer
 from tqdm import tqdm
-from typing_extensions import Annotated
 
 app = typer.Typer(help="A high-speed Python utility for organizing files into batches.")
 
